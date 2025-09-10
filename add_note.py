@@ -1,53 +1,106 @@
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 import speech_recognition as sr
 
 note_dir = "notes"
 os.makedirs(note_dir, exist_ok=True)
-today = datetime.today().strftime("%Y-%m-%d")
-note_path = os.path.join(note_dir, f"{today}.txt")
 
 recognizer = sr.Recognizer()
 mic = sr.Microphone()
 
-print("🎤 Speak your daily note. Say 'Pa' before tomorrow's tasks.")
-print("Listening... (10 seconds max)")
+print("🎤 Say 'Today' or 'Tomorrow' followed by your note. Say 'Stop listening' to end.")
 
-with mic as source:
-    recognizer.adjust_for_ambient_noise(source)
-    audio = recognizer.listen(source, timeout=10)
+while True:
+    print("Listening...")
+    with mic as source:
+        recognizer.adjust_for_ambient_noise(source)
+        audio = recognizer.listen(source)
 
-try:
-    text = recognizer.recognize_google(audio)
-    print("📝 Transcription:\n", text)
-except sr.UnknownValueError:
-    print("Could not understand audio.")
-    text = ""
-except sr.RequestError as e:
-    print("Speech recognition error:", str(e))
-    text = ""
+    try:
+        text = recognizer.recognize_google(audio)
+        print("📝 Transcription:\n", text)
+    except sr.UnknownValueError:
+        print("Could not understand audio.")
+        continue
+    except sr.RequestError as e:
+        print("Speech recognition error:", str(e))
+        continue
 
-# Parse note sections
-note_lines = [f"Date: {today}", "", "Tasks Done:"]
-pending = []
-done = []
-if "Pa" in text:
-    print('ifpart')
-    parts = text.split("Pa")
-    #done_text = parts[0].strip()
-    pending_text = parts[1].strip()
-    #done = [f"- {line.strip()}" for line in done_text.split(".") if line.strip()]
-    pending = [f"- {line.strip()}" for line in pending_text.split(".") if line.strip()]
-else:
-    done = [f"- {line.strip()}" for line in text.split(".") if line.strip()]
-    print('else')
+    text = text.strip()
+    lower_text = text.lower()
 
-note_lines.extend(done)
-note_lines.append("")
-note_lines.append("Pending / Tomorrow:")
-note_lines.extend(pending)
+    if lower_text == "stop listening":
+        print("🛑 Stopped listening.")
+        break
 
-with open(note_path, "w") as f:
-    f.write("\n".join(note_lines))
+    # Check for "Today" or "Tomorrow" as a command to enter recording mode
+    if lower_text == "today":
+        note_date = datetime.today()
+        note_path = os.path.join(note_dir, f"{note_date.strftime('%Y-%m-%d')}.txt")
+        print("Recording for today. Say 'Stop listening' to end.")
+        while True:
+            with mic as source:
+                recognizer.adjust_for_ambient_noise(source)
+                audio = recognizer.listen(source)
+            try:
+                segment = recognizer.recognize_google(audio)
+                print("📝 Transcription:\n", segment)
+            except sr.UnknownValueError:
+                print("Could not understand audio.")
+                continue
+            except sr.RequestError as e:
+                print("Speech recognition error:", str(e))
+                continue
+            segment = segment.strip()
+            if segment.lower() == "stop listening":
+                print("🛑 Stopped listening.")
+                break
+            with open(note_path, "a") as f:
+                f.write(segment + "\n")
+            print(f"✅ Note saved to {note_path}")
+        continue
 
-print(f"✅ Note saved to {note_path}")
+    if lower_text == "tomorrow":
+        note_date = datetime.today() + timedelta(days=1)
+        note_path = os.path.join(note_dir, f"{note_date.strftime('%Y-%m-%d')}.txt")
+        print("Recording for tomorrow. Say 'Stop listening' to end.")
+        while True:
+            with mic as source:
+                recognizer.adjust_for_ambient_noise(source)
+                audio = recognizer.listen(source)
+            try:
+                segment = recognizer.recognize_google(audio)
+                print("📝 Transcription:\n", segment)
+            except sr.UnknownValueError:
+                print("Could not understand audio.")
+                continue
+            except sr.RequestError as e:
+                print("Speech recognition error:", str(e))
+                continue
+            segment = segment.strip()
+            if segment.lower() == "stop listening":
+                print("🛑 Stopped listening.")
+                break
+            with open(note_path, "a") as f:
+                f.write(segment + "\n")
+            print(f"✅ Note saved to {note_path}")
+        continue
+
+    # Original functionality for "Today ..." or "Tomorrow ..." one-liners
+    if lower_text.startswith("today"):
+        note_date = datetime.today()
+        note_content = text[5:].strip()  # Remove "Today"
+    elif lower_text.startswith("tomorrow"):
+        note_date = datetime.today() + timedelta(days=1)
+        note_content = text[8:].strip()  # Remove "Tomorrow"
+    else:
+        print("Please start your note with 'Today' or 'Tomorrow'.")
+        note_date = datetime.today()
+        note_content = text
+
+    note_path = os.path.join(note_dir, f"{note_date.strftime('%Y-%m-%d')}.txt")
+
+    with open(note_path, "a") as f:
+        f.write(note_content + "\n")
+
+    print(f"✅ Note saved to {note_path}")
